@@ -29,7 +29,12 @@ const Product = ({ isChecked, isToggle }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
-
+  const [age, setAge] = useState("");
+  const [weight, setWeight] = useState("");
+  const [height, setHeight] = useState("");
+  const [gender, setGender] = useState("");
+  const [goal, setGoal] = useState("");
+  const [kcal, setKcal] = useState("");
   const [fatFilter, setFatFilter] = useState("all");
   const [saturatesFilter, setSaturatesFilter] = useState("all");
   const [sugarsFilter, setSugarsFilter] = useState("all");
