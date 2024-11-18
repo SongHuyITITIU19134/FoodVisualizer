@@ -39,6 +39,120 @@ const Product = ({ isChecked, isToggle }) => {
     streamProtocol: "text",
     fetch: `${URL || `http://localhost:${PORT}`}/api/chat`,
   });
+  const extractCalories = (response) => {
+    const caloriesMatch = response.match(/Kcal:\s*(\d+)(?:\s*|\.)/);
+
+    if (caloriesMatch) {
+      return caloriesMatch[1];
+    } else {
+      return null;
+    }
+  };
+
+  const handleUserInfo = async (e) => {
+    e.preventDefault();
+
+    // Ensure inputs are valid before processing
+    const parsedAge = parseInt(age, 10);
+    const parsedWeight = parseInt(weight, 10);
+    const parsedHeight = parseInt(height, 10);
+
+    if (isNaN(parsedAge) || isNaN(parsedWeight) || isNaN(parsedHeight)) {
+      alert("Please enter valid numbers for age, weight, and height.");
+      return;
+    }
+
+    if (!gender || !goal) {
+      alert("Please select both gender and goal.");
+      return;
+    }
+
+    // Create the user info object
+    const userInfo = {
+      age: parsedAge,
+      weight: parsedWeight,
+      height: parsedHeight,
+      gender,
+      goal,
+    };
+
+    console.log("User info to be saved:", userInfo);
+
+    // Save user info to localStorage
+    localStorage.setItem("userInfo", JSON.stringify(userInfo));
+
+    // Alert the user of success
+    alert("User info has been saved successfully!");
+
+    // Create a message to be sent to the chatbot with the user info
+    const userMessage = {
+      role: "user",
+      content: `
+        - Age: ${parsedAge}
+        - Gender: ${gender}
+        - Height: ${parsedHeight} cm
+        - Weight: ${parsedWeight} kg
+        - Goal: ${goal}
+      `,
+    };
+
+    try {
+      // Send the user info and the message to the backend
+      const response = await fetch(
+        `${URL || `http://localhost:${PORT}`}/api/chat`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messages: [userMessage], // Send the user message to the chatbot
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Error response from server:", errorData);
+        alert("There was an error processing your request.");
+        return;
+      }
+
+      const reader = response.body.getReader();
+
+      const decoder = new TextDecoder("utf-8");
+
+      let finalResponse = "";
+      let caloriesValue = null;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        finalResponse += decoder.decode(value);
+        finalResponse = finalResponse.replace(/[*#]/g, "");
+        caloriesValue = extractCalories(finalResponse);
+
+        setKcal(caloriesValue);
+      }
+
+      console.log("Kcal in Suggest", kcal);
+      const assistantMessage = {
+        role: "system",
+        content: finalResponse,
+      };
+
+      const updatedMessages = [...messages, userMessage, assistantMessage];
+      setMessages(updatedMessages);
+
+      // Save the updated messages to localStorage
+      localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
+
+      // Clear the input field
+      setInput("");
+    } catch (error) {
+      console.error("Error fetching chat:", error);
+      alert("There was an error sending the request.");
+    }
+  };
 
   useEffect(() => {
     const savedMessages = localStorage.getItem("chatMessages");
