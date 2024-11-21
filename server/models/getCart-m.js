@@ -1,26 +1,3 @@
-import mysql from "mysql2/promise";
-import { dbPool } from "../dbconfig.js";
-
-export default class Cart {
-  static async getUserCart(userId) {
-    try {
-      const query = `SELECT product.*, cart.quantity 
-        FROM cart 
-        JOIN product ON cart.product_id = product.product_id 
-        WHERE cart.user_id = ?`;
-      const [cartItems] = await dbPool.query(query, [userId]);
-
-      if (!cartItems.length) {
-        return { status: "error", message: "Cart is empty" };
-      }
-      //   console.log(cartItems);
-      return { status: "success", cartItems: cartItems };
-    } catch (error) {
-      console.error("Error:", error);
-      throw error;
-    }
-  }
-
   static async getUserCartWithNutrients(userId) {
     try {
       // const { userId } = userId;
@@ -72,12 +49,24 @@ export default class Cart {
       totalNutrition.sugars = parseFloat(totalNutrition.sugars.toFixed(1));
       totalNutrition.salt = parseFloat(totalNutrition.salt.toFixed(1));
 
-      // console.log("Total: ", totalNutrition);
-      // console.log("cartItems[0]: ", cartItems[0]);
-      // console.log("totalNutrition[0]: ", totalNutrition[0]);
+      const cartWithCalories = itemNutrients[0].map((item) => {
+        const itemCalories = item.calories * item.quantity;
+        totalNutrition.energy += item.energy * item.quantity;
+        totalNutrition.calories += itemCalories;
+        totalNutrition.fat += item.fat * item.quantity;
+        totalNutrition.saturates += item.saturates * item.quantity;
+        totalNutrition.sugars += item.sugars * item.quantity;
+        totalNutrition.salt += item.salt * item.quantity;
+
+        // Add a field for calories per product
+        return {
+          ...item,
+          caloriesPerProduct: parseFloat(itemCalories.toFixed(1)), // Round to 1 decimal
+        };
+      });
       return {
         status: "success",
-        cartItems: cartItems[0],
+        cartItems: cartWithCalories,
         totalNutrition: totalNutrition,
       };
     } catch (error) {
@@ -85,41 +74,3 @@ export default class Cart {
       throw error;
     }
   }
-
-  static async postUserCart(userId, productId) {
-    if (!userId || !productId) {
-      return {
-        status: "error",
-        message: "User ID and Product ID are required",
-      };
-    }
-    try {
-      const checkQuery = `SELECT * FROM cart WHERE user_id = ? AND product_id = ?`;
-      const [existingCartItem] = await dbPool.query(checkQuery, [
-        userId,
-        productId,
-      ]);
-
-      if (existingCartItem.length > 0) {
-        const updateQuery = `UPDATE cart SET quantity = quantity + 1 WHERE user_id = ? AND product_id = ?`;
-        await dbPool.query(updateQuery, [userId, productId]);
-      } else {
-        const insertQuery = `INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, 1)`;
-        await dbPool.query(insertQuery, [userId, productId]);
-      }
-      return {
-        status: "success",
-        message: "Product added to cart successfully",
-      };
-    } catch (error) {
-      console.error("Error adding product to cart:", error);
-      return { error: "Internal server error" };
-    }
-  }
-
-  static async removeProductFromCart(userId, productId) {
-    const query = `DELETE FROM cart WHERE user_id = ? AND product_id = ?`;
-    const [result] = await dbPool.query(query, [userId, productId]);
-    return result;
-  }
-}
